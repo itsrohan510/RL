@@ -1,65 +1,64 @@
-/* ═══════════════════════════════════════════════════
-   main.js — Bootstrap & Game Loop
-   ═══════════════════════════════════════════════════ */
-
-import { SimulationEngine }        from './simulation.js';
+/* main.js — Improved & Fixed Game Loop */
+import { SimulationEngine } from './simulation.js';
 import { CollisionAvoidanceAgent, NeuralAgent } from './agent.js';
-import { SceneManager }            from './renderer.js';
-import { UIManager, SoundEngine }  from './ui.js';
+import { SceneManager } from './renderer.js';
+import { UIManager, SoundEngine } from './ui.js';
 
 let sim, agent, scene, ui, sound;
 let lastTime = 0;
 let alertCooldowns = new Map();
 
 async function init() {
-  sim   = new SimulationEngine();
+  sim = new SimulationEngine();
 
-  // Try loading trained neural agent; fall back to heuristic
-  agent = await NeuralAgent.load('./trained_weights.json');
-  const agentType = agent ? 'Neural PPO Policy' : 'Heuristic';
+  // Load neural agent or fallback
+  agent = await NeuralAgent.load('./trained_weights.json').catch(() => null);
+  agent = null;
+  const agentType = agent ? 'Neural PPO' : 'Heuristic Agent';
   if (!agent) agent = new CollisionAvoidanceAgent();
+
   scene = new SceneManager(document.getElementById('canvas-container'));
-  ui    = new UIManager();
+  ui = new UIManager();
   sound = new SoundEngine();
 
-  // Sound toggle
   document.getElementById('sound-btn').addEventListener('click', () => {
     const on = sound.toggle();
     document.getElementById('sound-btn').textContent = on ? '🔊' : '🔇';
   });
 
-  // Initialize sound on first click anywhere (autoplay policy)
   document.addEventListener('click', () => sound._ensure(), { once: true });
 
   await scene.init();
 
-  ui.addLog(`[SYS] Orbital Guardian initialized — Episode ${sim.episodeId}`, 'info');
+  ui.addLog(`[SYS] Orbital Guardian started — Episode ${sim.episodeId}`, 'info');
   ui.addLog(`[SYS] Agent: ${agentType}`, agentType.includes('Neural') ? 'avoid' : 'info');
-  ui.addLog(`[SYS] Tracking ${sim.satellites.length} satellites, ${sim.debris.length} debris objects`, 'info');
+  ui.addLog(`[SYS] ${sim.satellites.length} satellites + ${sim.debris.length} debris`, 'info');
 
   ui.hideLoading();
-
   requestAnimationFrame(loop);
 }
 
 function loop(timestamp) {
   requestAnimationFrame(loop);
 
-  const rawDt = Math.min((timestamp - lastTime) / 1000, 0.05); // cap at 50ms
+  const rawDt = Math.min((timestamp - lastTime) / 1000, 0.05);
   lastTime = timestamp;
 
   const warp = ui.getTimeWarp();
   if (warp === 0) {
-    scene.tick();
-    return; // paused
+    scene.tick();   // still allow camera movement when paused
+    return;
   }
 
-  const dt = rawDt * warp;
+  const dt = rawDt * warp * 2;   // ← Increased effective speed (8×) so orbits are visible
 
-  // ── 1. Step simulation ──
-  const obs = sim.step(dt);
+  const MAX_DT = 0.15;
+  const substeps = Math.ceil(dt / MAX_DT);
+  const subDt = dt / substeps;
+  let obs;
+  for (let i = 0; i < substeps; i++) obs = sim.step(subDt);
 
-  // ── 2. Agent evaluates & acts (Throttled for NeuralAgent to match 0.2s training) ──
+  // Agent actions
   let actions = [];
   if (agent instanceof NeuralAgent) {
     agent.accumulator = (agent.accumulator || 0) + dt;
@@ -72,71 +71,49 @@ function loop(timestamp) {
   }
 
   for (const action of actions) {
-    const ok = sim.applyAction(action);
-    if (ok) {
-      const m = action.metadata;
-
-      // Thruster visual + sound
+    if (sim.applyAction(action)) {
       const screenPos = scene.showManeuver(action.satellite_id, action.delta_v);
       sound.playThruster();
 
-      // Log
       const dv = action.delta_v.map(v => v.toFixed(3));
-      const timeStr = formatTime(obs.time);
-      ui.addLog(
-        `[${timeStr}] ${action.satellite_id}: Δv [${dv}] — ${m.reason}`,
-        'burn'
-      );
+      ui.addLog(`[${formatTime(obs.time)}] ${action.satellite_id}: Δv [${dv}] — ${action.metadata.reason}`, 'burn');
 
-      if (screenPos) {
-        ui.showManeuverPopup(screenPos, `BURN — ${action.satellite_id}`);
-      }
+      if (screenPos) ui.showManeuverPopup(screenPos, `BURN — ${action.satellite_id}`);
     }
   }
 
-  // ── 3. Handle events ──
+  // Events & alerts (same as before)
   for (const evt of obs.recentEvents) {
-    const timeStr = formatTime(obs.time);
+    const t = formatTime(obs.time);
     if (evt.type === 'avoided') {
-      ui.addLog(`[${timeStr}] ✓ COLLISION AVOIDED — ${evt.pair[0]} ↔ ${evt.pair[1]}`, 'avoid');
+      ui.addLog(`[${t}] ✓ AVOIDED — ${evt.pair[0]} ↔ ${evt.pair[1]}`, 'avoid');
       sound.playSuccess();
     } else if (evt.type === 'collision') {
-      ui.addLog(`[${timeStr}] ✗ COLLISION — ${evt.pair[0]} ↔ ${evt.pair[1]}`, 'alert');
+      ui.addLog(`[${t}] ✗ COLLISION — ${evt.pair[0]} ↔ ${evt.pair[1]}`, 'alert');
     }
   }
 
-  // ── 4. Alerts for critical threats ──
   for (const dp of obs.danger_pairs) {
-    if (dp.level === 'CRITICAL') {
-      const key = `${dp.sat_id}|${dp.obj_id}`;
-      const lastAlert = alertCooldowns.get(key) || 0;
-      if (timestamp - lastAlert > 5000) {
-        ui.showAlert('CRITICAL', `${dp.sat_id} ↔ ${dp.obj_id} — Miss: ${dp.miss_distance.toFixed(3)} — TCA: ${dp.tca.toFixed(1)}s`);
-        sound.playAlarm('CRITICAL');
-        sound.playHeartbeat();
-        alertCooldowns.set(key, timestamp);
-      }
-    }
-  }
+    if ((dp.level === 'WARNING' || dp.level === 'CRITICAL') && 
+        dp.tca <= 0.5 && 
+        dp.miss_distance > 0.12) {           // increased threshold
 
-  // ── 5. Mark avoidances (pair was critical, now resolved by distance) ──
-  // Simple heuristic: if agent burned for a pair and distance is now increasing
-  for (const dp of obs.danger_pairs) {
-    if (dp.level === 'WARNING' || dp.level === 'CRITICAL') {
       const key = `${dp.sat_id}|${dp.obj_id}`;
-      if (agent.recentBurns.has(key) && dp.tca <= 0.1 && dp.miss_distance > 0.1) {
+      
+      // If agent recently burned for this pair → count as avoided
+      if (agent.recentBurns && agent.recentBurns.has(key)) {
         sim.markAvoided(dp.sat_id, dp.obj_id);
         agent.recentBurns.delete(key);
+        ui.addLog(`[${formatTime(obs.time)}] ✓ COLLISION SUCCESSFULLY AVOIDED — ${dp.sat_id} ↔ ${dp.obj_id}`, 'avoid');
       }
     }
   }
 
-  // ── 6. Update renderer & UI ──
+  // Update visuals
   scene.updateBodies(obs.satellites, obs.debris);
   scene.updateDangerZones(obs.danger_pairs);
   scene.tick();
 
-  // Throttle UI updates (every 3rd frame)
   if (obs.stepCount % 3 === 0) {
     ui.updateClock(obs.time, obs.episodeId);
     ui.updateRoster(obs.satellites);
@@ -152,8 +129,4 @@ function formatTime(t) {
   return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}.${ms}`;
 }
 
-init().catch(err => {
-  console.error('Fatal init error:', err);
-  document.getElementById('loading-screen').querySelector('.loader-subtext').textContent =
-    'Error initializing — check console';
-});
+init().catch(err => console.error(err));

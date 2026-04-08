@@ -5,11 +5,11 @@
 import { vec3Len, vec3Sub, vec3Add, vec3Scale, vec3Cross, vec3Norm, vec3Dot,
          CRITICAL_R, WARNING_R, CAUTION_R } from './simulation.js';
 
-const BURN_TCA_THRESHOLD   = 12;   // seconds — plan burn if TCA < this
-const BURN_MISS_THRESHOLD  = 0.55; // scene units — act if predicted miss < this
-const MAX_DV               = 0.04; // max delta-v per burn
-const MIN_FUEL_RESERVE     = 5;    // don't burn below this fuel level
-const COOLDOWN_STEPS       = 60;   // steps between burns for same pair
+const BURN_TCA_THRESHOLD   = 35;   // seconds — plan burn if TCA < this
+const BURN_MISS_THRESHOLD  = 0.38; // scene units — act if predicted miss < this
+const MAX_DV               = 0.09; // max delta-v per burn
+const MIN_FUEL_RESERVE     = 8;    // don't burn below this fuel level
+const COOLDOWN_STEPS       = 30;   // steps between burns for same pair
 
 export class CollisionAvoidanceAgent {
   constructor() {

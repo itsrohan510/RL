@@ -16,7 +16,7 @@ const SAFE_COLOR    = new THREE.Color(0x00ff88);
 const TRAIL_SAT     = new THREE.Color(0x00a0cc);
 const TRAIL_DEB     = new THREE.Color(0x993d1a);
 
-const TRAIL_MAX = 200;
+const TRAIL_MAX = 15;
 
 export class SceneManager {
   constructor(container) {

@@ -3,11 +3,11 @@
    ═══════════════════════════════════════════════════ */
 
 const EARTH_RADIUS  = 5;          // scene units
-const GM            = 2.5;        // gravitational parameter (scene-units³/s²)
+const GM            = 25;        // gravitational parameter (scene-units³/s²)
 const COLLISION_R   = 0.08;       // collision distance
-const CRITICAL_R    = 0.35;
-const WARNING_R     = 0.7;
-const CAUTION_R     = 1.2;
+const CRITICAL_R    = 0.45;
+const WARNING_R     = 0.85;
+const CAUTION_R     = 1.5;
 
 // ─── Utility vectors ───
 function vec3Len(v) { return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); }
@@ -137,7 +137,7 @@ export class SimulationEngine {
 
     const dv = action.delta_v;
     const dvMag = vec3Len(dv);
-    const fuelCost = dvMag * 30;
+    const fuelCost = dvMag * 12;
 
     if (sat.fuel < fuelCost * 0.1) return false; // not enough fuel even for a tiny burn
 
@@ -146,7 +146,7 @@ export class SimulationEngine {
     sat.vz += dv[2];
     sat.fuel = Math.max(0, sat.fuel - fuelCost);
     this.totalFuelUsed += fuelCost;
-    this.reward -= dvMag * 5; // fuel penalty
+    this.reward -= dvMag * 2; // fuel penalty
     return true;
   }
 
@@ -162,14 +162,15 @@ export class SimulationEngine {
       // Store trail point (every 4th step to save memory)
       if (this.stepCount % 4 === 0) {
         b.trail.push([b.x, b.y, b.z]);
-        if (b.trail.length > 200) b.trail.shift();
+        if (b.trail.length > 15) b.trail.shift();
       }
 
       // Gravitational acceleration
       const r = Math.sqrt(b.x*b.x + b.y*b.y + b.z*b.z);
       if (r < EARTH_RADIUS * 0.9) {
         // re-entered — respawn debris, mark satellite as lost
-        if (b.type === 'deb') this._respawnDebris(b);
+        if (b.type === 'deb') { this._respawnDebris(b); continue; }
+        b.status = 'LOST';
         continue;
       }
       const aG = -GM / (r * r * r); // factor for acceleration (includes 1/r for direction)
@@ -223,7 +224,6 @@ export class SimulationEngine {
       collisionsAvoided: this.collisionsAvoided,
       collisions: this.collisions,
       totalFuelUsed: this.totalFuelUsed,
-      reward: this.reward,
       recentEvents: this.recentEvents
     };
   }
@@ -246,20 +246,20 @@ export class SimulationEngine {
     }
 
     let level = 'CAUTION';
-    if (missDistance < COLLISION_R) {
+    if (missDistance < COLLISION_R || dist < COLLISION_R) {
       level = 'COLLISION';
       this.collisions++;
-      this.reward -= 500;
+      this.reward -= 200;
       this.recentEvents.push({ type: 'collision', pair: [a.id, b.id] });
       a.status = 'DANGER';
-    } else if (missDistance < CRITICAL_R || (dist < CRITICAL_R)) {
+    } 
+    else if (missDistance < CRITICAL_R || dist < CRITICAL_R * 0.8) {
       level = 'CRITICAL';
       a.status = 'DANGER';
-    } else if (missDistance < WARNING_R || (dist < WARNING_R)) {
+    } 
+    else if (missDistance < WARNING_R || dist < WARNING_R) {
       level = 'WARNING';
       if (a.status !== 'DANGER') a.status = 'CAUTION';
-    } else {
-      if (a.status === 'SAFE') a.status = a.status; // keep safe
     }
 
     this.dangerPairs.push({

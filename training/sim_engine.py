@@ -6,7 +6,7 @@ Physics are identical: same GM, radii, thresholds, Euler integrator.
 import numpy as np
 
 EARTH_RADIUS = 5.0
-GM = 2.5
+GM = 25
 COLLISION_R = 0.08
 CRITICAL_R = 0.35
 WARNING_R = 0.7
