@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Orbital Guardian — Real-time satellite collision avoidance system with 3D orbital map">
+  <title>Orbital Guardian — Collision Avoidance</title>
+  <link rel="stylesheet" href="index.css">
+</head>
+<body>
+  <!-- Loading Screen -->
+  <div id="loading-screen">
+    <div class="loader-ring"></div>
+    <div class="loader-text">ORBITAL GUARDIAN</div>
+    <div class="loader-subtext">Initializing satellite telemetry…</div>
+  </div>
+
+  <div id="app">
+    <div id="canvas-container"></div>
+
+    <div id="hud">
+      <!-- ═══ Top Bar ═══ -->
+      <div id="top-bar" class="hud-panel">
+        <div id="mission-title">
+          <span class="accent">ORBITAL GUARDIAN</span>
+          <span class="subtitle">Collision Avoidance System</span>
+        </div>
+        <div id="mission-clock">
+          <span class="label">Mission Time</span>
+          <span id="clock-value" class="value">00:00:00.0</span>
+        </div>
+        <div id="time-warp">
+          <span class="label">Time Warp</span>
+          <div id="warp-buttons">
+            <button class="warp-btn active" data-warp="1">1×</button>
+            <button class="warp-btn" data-warp="10">10×</button>
+            <button class="warp-btn" data-warp="100">100×</button>
+            <button class="warp-btn" data-warp="1000">1000×</button>
+          </div>
+        </div>
+        <div id="episode-info">
+          <span class="label">Episode</span>
+          <span id="episode-value" class="value">#001</span>
+        </div>
+        <button id="pause-btn" title="Pause / Resume">▶</button>
+        <button id="sound-btn" title="Toggle Sound">🔊</button>
+      </div>
+
+      <!-- ═══ Left Panel — Satellite Roster ═══ -->
+      <div id="left-panel" class="hud-panel">
+        <div class="panel-header">
+          <span class="panel-title">SATELLITE ROSTER</span>
+        </div>
+        <div id="satellite-roster" class="panel-content"></div>
+      </div>
+
+      <!-- ═══ Right Panel — Threat Assessment ═══ -->
+      <div id="right-panel" class="hud-panel">
+        <div class="panel-header">
+          <span class="panel-title">THREAT ASSESSMENT</span>
+          <span class="threat-count" id="active-threats">0 ACTIVE</span>
+        </div>
+        <div id="threat-feed" class="panel-content"></div>
+      </div>
+
+      <!-- ═══ Bottom Bar ═══ -->
+      <div id="bottom-bar" class="hud-panel">
+        <div id="action-log-container">
+          <span class="panel-title">AGENT ACTION LOG</span>
+          <div id="action-log"></div>
+        </div>
+        <div id="stats-panel">
+          <div class="stat-item">
+            <span class="stat-label">Avoided</span>
+            <span id="stat-avoided" class="stat-value success">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Fuel Used</span>
+            <span id="stat-fuel" class="stat-value">0.0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Reward</span>
+            <span id="stat-reward" class="stat-value accent">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Step</span>
+            <span id="stat-step" class="stat-value">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Full-screen alert -->
+    <div id="alert-overlay" class="hidden">
+      <div id="alert-content">
+        <div id="alert-icon">⚠️</div>
+        <div id="alert-title">COLLISION WARNING</div>
+        <div id="alert-message"></div>
+      </div>
+    </div>
+
+    <div id="maneuver-popup" class="hidden">
+      <span id="maneuver-text">BURN EXECUTED</span>
+    </div>
+  </div>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.164.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
